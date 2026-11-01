@@ -1,0 +1,584 @@
+
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Учёт картриджей и фотобарабанов</title>
+
+    <style>
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            background: #f3f5f9;
+            color: #243247;
+            font-family: Arial, sans-serif;
+        }
+
+        header {
+            background: #234563;
+            color: white;
+            padding: 24px;
+        }
+
+        header h1 { margin: 0 0 8px; }
+        header p { margin: 0; color: #dce9f3; }
+
+        section {
+            background: white;
+            padding: 24px;
+            margin-bottom: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px #0000000d;
+        }
+
+        h2 { margin-top: 0; }
+
+        .fields {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        label {
+            display: flex;
+            flex-direction: column;
+            gap: 7px;
+            font-weight: bold;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 11px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            font: inherit;
+        }
+
+        button {
+            padding: 12px 20px;
+            background: #2563a6;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        button:hover { background: #194b80; }
+
+        .note {
+            color: #64748b;
+            font-size: 14px;
+        }
+
+        .table-wrap { overflow-x: auto; }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        th { background: #edf3f9; }
+
+        .message { margin-left: 12px; }
+        .success { color: #16803c; }
+        .error { color: #b91c1c; }
+        .warning { color: #b45309; font-weight: bold; }
+
+        [hidden] { display: none !important; }
+
+        @media (max-width: 650px) {
+            .fields { grid-template-columns: 1fr; }
+            .message { display: block; margin: 12px 0 0; }
+        }
+
+        /* Компактная панель: максимум ширины для склада и журнала. */
+        main {
+            display: grid;
+            align-items: start;
+            width: calc(100% - 24px);
+            max-width: 1920px;
+            margin: 14px auto;
+            padding: 0;
+            grid-template-columns: minmax(0, 39fr) minmax(0, 61fr);
+            gap: 12px;
+        }
+
+        main > section:first-child {
+            grid-column: 1 / -1;
+            width: 100%;
+            max-width: 760px;
+            justify-self: center;
+            margin-bottom: 0;
+        }
+
+        main > section:nth-child(2),
+        main > section:nth-child(3) {
+            min-width: 0;
+            padding: 14px;
+            margin-bottom: 0;
+            overflow: visible;
+        }
+
+        main > section:nth-child(2) { grid-column: 1; }
+        main > section:nth-child(3) { grid-column: 2; }
+
+        main > section:nth-child(n+2) h2 {
+            font-size: 20px;
+            margin-bottom: 10px;
+        }
+
+        /* Вертикальная прокрутка прямо внутри каждой таблицы.
+           Нижняя граница таблицы остаётся возле низа видимого экрана. */
+        main > section:nth-child(n+2) .table-wrap {
+            height: clamp(240px, calc(100dvh - 640px), 540px);
+            overflow-y: auto;
+            overflow-x: hidden;
+            scrollbar-gutter: stable;
+        }
+
+        .table-wrap table {
+            table-layout: fixed;
+            width: 100%;
+        }
+
+        .table-wrap th,
+        .table-wrap td {
+            padding: 8px 5px;
+            font-size: 12px;
+            line-height: 1.35;
+            vertical-align: top;
+            overflow-wrap: anywhere;
+        }
+
+        .table-wrap th {
+            position: sticky;
+            top: 0;
+            z-index: 1;
+            background: #edf3f9;
+        }
+
+        /* Все 5 исходных столбцов склада. */
+        main > section:nth-child(2) th:nth-child(1) { width: 33%; }
+        main > section:nth-child(2) th:nth-child(2) { width: 19%; }
+        main > section:nth-child(2) th:nth-child(3) { width: 15%; }
+        main > section:nth-child(2) th:nth-child(4) { width: 15%; }
+        main > section:nth-child(2) th:nth-child(5) { width: 18%; }
+
+        /* Все 8 исходных столбцов журнала. */
+        main > section:nth-child(3) th:nth-child(1) { width: 12%; }
+        main > section:nth-child(3) th:nth-child(2) { width: 13%; }
+        main > section:nth-child(3) th:nth-child(3) { width: 17%; }
+        main > section:nth-child(3) th:nth-child(4) { width: 12%; }
+        main > section:nth-child(3) th:nth-child(5) { width: 12%; }
+        main > section:nth-child(3) th:nth-child(6) { width: 10%; }
+        main > section:nth-child(3) th:nth-child(7) { width: 15%; }
+        main > section:nth-child(3) th:nth-child(8) { width: 9%; }
+
+        .history-date { white-space: pre-line; }
+
+        @media (max-width: 1300px) {
+            main { grid-template-columns: minmax(0, 1fr); }
+            main > section:nth-child(2),
+            main > section:nth-child(3) { grid-column: 1; }
+            main > section:nth-child(n+2) .table-wrap {
+                height: min(440px, max(240px, 52dvh));
+            }
+        }
+
+        @media (max-width: 650px) {
+            main { width: calc(100% - 16px); }
+            main > section:nth-child(2),
+            main > section:nth-child(3) { padding: 10px; }
+            main > section:nth-child(n+2) .table-wrap { overflow-x: auto; }
+            main > section:nth-child(2) table { min-width: 580px; }
+            main > section:nth-child(3) table { min-width: 850px; }
+        }
+
+    </style>
+</head>
+
+<body>
+<header>
+    <h1>Учёт картриджей и фотобарабанов</h1>
+    <p>Поступления, замены, инвентаризация и складские остатки</p>
+</header>
+
+<main>
+    <section>
+        <h2>Регистрация операции</h2>
+
+        <form id="operationForm">
+            <div class="fields">
+                <label>
+                    Тип операции
+                    <select id="operationType">
+                        <option value="RECEIPT">Поступление</option>
+                        <option value="REPLACEMENT">Замена</option>
+                        <option value="INVENTORY">Инвентаризация</option>
+                    </select>
+                </label>
+
+                <label>
+                    Тип расходного материала
+                    <select id="type">
+                        <option value="CARTRIDGE">Картридж</option>
+                        <option value="DRUM">Фотобарабан</option>
+                    </select>
+                </label>
+
+                <label>
+                    Модель расходного материала
+                    <input id="model" list="modelList"
+                           placeholder="Например, TN-3480"
+                           maxlength="255" required>
+                    <datalist id="modelList"></datalist>
+                </label>
+
+                <label>
+                    <span id="quantityLabelText">Количество</span>
+                    <input id="quantity" type="number"
+                           min="1" step="1" required>
+                </label>
+            </div>
+
+            <div class="fields" id="newMaterialFields">
+                <label>
+                    Минимальный запас для предупреждения
+                    <input id="minStock" type="number"
+                           min="0" step="1" value="2">
+                </label>
+            </div>
+
+            <div class="fields" id="replacementFields" hidden>
+                <label>
+                    Кабинет
+                    <input id="room" list="roomList"
+                           placeholder="Например, корпус 1, кабинет 101"
+                           maxlength="255">
+                    <datalist id="roomList"></datalist>
+                </label>
+
+                <label>
+                    Модель принтера или МФУ
+                    <input id="printerModel"
+                           placeholder="Brother HL-L6400DWT"
+                           maxlength="255"
+                           list="printerModels">
+                </label>
+            </div>
+
+            <p class="note" id="quantityHint">
+                Укажите количество поступивших расходных материалов.
+            </p>
+
+            <button type="submit">Сохранить операцию</button>
+            <span id="message" class="message" role="status"></span>
+        </form>
+    </section>
+
+    <section>
+        <h2>Складские остатки</h2>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                <tr>
+                    <th>Модель</th>
+                    <th>Тип</th>
+                    <th>Остаток</th>
+                    <th>Минимум</th>
+                    <th>Состояние</th>
+                </tr>
+                </thead>
+                <tbody id="stockRows">
+                <tr>
+                    <td colspan="5">Загрузка данных...</td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section>
+        <h2>Журнал операций</h2>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                <tr>
+                    <th>Дата</th>
+                    <th>Операция</th>
+                    <th>Модель</th>
+                    <th>Тип</th>
+                    <th>Количество</th>
+                    <th>Кабинет</th>
+                    <th>Принтер</th>
+                    <th>Остаток после</th>
+                </tr>
+                </thead>
+                <tbody id="historyRows">
+                <tr>
+                    <td colspan="8">Загрузка данных...</td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+</main>
+
+<script>
+    const $ = id => document.getElementById(id);
+    let materials = [];
+    let operations = [];
+
+    // Справочник моделей берётся из актуальных складских остатков H2.
+    function findMaterial(modelName) {
+        const normalized = modelName.trim().toLocaleLowerCase('ru-RU');
+        return materials.find(item =>
+            item.model.toLocaleLowerCase('ru-RU') === normalized);
+    }
+
+    function refreshMaterialOptions() {
+        const modelList = $('modelList');
+        modelList.replaceChildren();
+
+        for (const item of materials) {
+            if (item.type !== $('type').value) continue;
+            const option = document.createElement('option');
+            option.value = item.model;
+            modelList.appendChild(option);
+        }
+    }
+
+    function refreshRoomOptions() {
+        const roomList = $('roomList');
+        roomList.replaceChildren();
+
+        const rooms = [...new Set(
+            operations
+                .filter(item => item.operationType === 'REPLACEMENT')
+                .map(item => (item.room || '').trim())
+                .filter(Boolean)
+        )].sort((a, b) => a.localeCompare(b, 'ru'));
+
+        for (const room of rooms) {
+            const option = document.createElement('option');
+            option.value = room;
+            roomList.appendChild(option);
+        }
+    }
+
+    // Если модель уже известна, её тип всегда берётся из базы.
+    function syncSelectedMaterial() {
+        const existing = findMaterial($('model').value);
+        if (existing && $('type').value !== existing.type) {
+            $('type').value = existing.type;
+            refreshMaterialOptions();
+        }
+    }
+
+    function updateForm() {
+        const action = $('operationType').value;
+
+        $('newMaterialFields').hidden = action !== 'RECEIPT';
+        $('replacementFields').hidden = action !== 'REPLACEMENT';
+        $('room').required = action === 'REPLACEMENT';
+        $('printerModel').required = action === 'REPLACEMENT';
+        $('quantity').min = action === 'INVENTORY' ? 0 : 1;
+        $('quantityLabelText').textContent = action === 'INVENTORY'
+            ? 'Фактический остаток' : 'Количество';
+
+        const hints = {
+            RECEIPT: 'Укажите, сколько материалов поступило. Минимальный запас — порог предупреждения «Мало», а не текущий остаток.',
+            REPLACEMENT: 'Укажите количество заменённых материалов, кабинет и модель принтера.',
+            INVENTORY: 'Укажите фактическое количество на складе после пересчёта (можно 0).'
+        };
+        $('quantityHint').textContent = hints[action];
+    }
+
+    function message(text, isError = false) {
+        const element = $('message');
+        element.textContent = text;
+        element.className = 'message ' + (isError ? 'error' : 'success');
+    }
+
+    function cell(row, value) {
+        const td = row.insertCell();
+        td.textContent = value ?? '—';
+        return td;
+    }
+
+    function emptyTable(id, columns, text) {
+        const body = $(id);
+        body.replaceChildren();
+        const td = body.insertRow().insertCell();
+        td.colSpan = columns;
+        td.textContent = text;
+    }
+
+    async function loadState() {
+        const response = await fetch('/api/state');
+        if (!response.ok) {
+            throw new Error('Не удалось получить данные с сервера');
+        }
+
+        const data = await response.json();
+        materials = [...data.cartridges].sort((a, b) =>
+            a.model.localeCompare(b.model, 'ru'));
+        operations = [...data.operations].sort((a, b) => b.id - a.id);
+
+        const stock = $('stockRows');
+        const history = $('historyRows');
+        stock.replaceChildren();
+        history.replaceChildren();
+
+        if (materials.length === 0) {
+            emptyTable('stockRows', 5, 'Материалов пока нет');
+        }
+        for (const item of materials) {
+            const row = stock.insertRow();
+            cell(row, item.model);
+            cell(row, item.type === 'DRUM' ? 'Фотобарабан' : 'Картридж');
+            cell(row, item.quantity);
+            cell(row, item.minStock);
+
+            const status = cell(row, item.lowStock ? 'Мало' : 'Достаточно');
+            if (item.lowStock) status.className = 'warning';
+        }
+
+        if (operations.length === 0) {
+            emptyTable('historyRows', 8, 'Операций пока нет');
+        }
+
+        const names = {
+            RECEIPT: 'Поступление',
+            REPLACEMENT: 'Замена',
+            INVENTORY: 'Инвентаризация'
+        };
+
+        for (const item of operations) {
+            const row = history.insertRow();
+            const date = item.performedAt ? item.performedAt.slice(0, 19) : '';
+            const dateText = date.length >= 19
+                ? `${date.slice(8, 10)}.${date.slice(5, 7)}.${date.slice(0, 4)}\n${date.slice(11, 19)}`
+                : '—';
+            const dateCell = cell(row, dateText);
+            dateCell.classList.add('history-date');
+            cell(row, names[item.operationType] || item.operationType);
+            cell(row, item.model);
+            cell(row, item.type === 'DRUM' ? 'Фотобарабан' : 'Картридж');
+            cell(row, item.quantity);
+            cell(row, item.room);
+            cell(row, item.printerModel);
+            cell(row, item.afterQuantity);
+        }
+
+        refreshMaterialOptions();
+        refreshRoomOptions();
+        syncSelectedMaterial();
+    }
+
+    $('operationType').addEventListener('change', updateForm);
+
+    $('type').addEventListener('change', () => {
+        const selected = findMaterial($('model').value);
+        if (selected && selected.type !== $('type').value) {
+            $('model').value = '';
+        }
+        refreshMaterialOptions();
+    });
+
+    $('model').addEventListener('input', syncSelectedMaterial);
+
+    $('operationForm').addEventListener('submit', async function (event) {
+        event.preventDefault();
+        const button = this.querySelector('button[type="submit"]');
+        button.disabled = true;
+
+        try {
+            const action = $('operationType').value;
+            const name = $('model').value.trim();
+            const existing = findMaterial(name);
+            const quantity = Number($('quantity').value);
+
+            if (!name) throw new Error('Укажите модель расходного материала');
+            if (!Number.isInteger(quantity) ||
+                quantity < (action === 'INVENTORY' ? 0 : 1)) {
+                throw new Error('Укажите корректное целое количество');
+            }
+            if (action !== 'RECEIPT' && !existing) {
+                throw new Error('Модель отсутствует на складе. Сначала зарегистрируйте её поступление');
+            }
+            if (existing && existing.type !== $('type').value) {
+                throw new Error('Тип материала не соответствует выбранной модели');
+            }
+
+            const request = {
+                cartridgeModel: existing ? existing.model : name,
+                operationType: action,
+                quantity,
+                type: existing ? existing.type : $('type').value,
+                minStock: action === 'RECEIPT'
+                    ? ($('minStock').value === '' ? null : Number($('minStock').value))
+                    : null,
+                room: action === 'REPLACEMENT' ? $('room').value.trim() : '',
+                printerModel: action === 'REPLACEMENT'
+                    ? $('printerModel').value.trim() : ''
+            };
+
+            const response = await fetch('/api/operations', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(request)
+            });
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.error || 'Ошибка операции');
+            }
+
+            $('quantity').value = '';
+            message('Операция сохранена. Остаток: ' + result.balance);
+            await loadState();
+        } catch (error) {
+            message(error.message, true);
+        } finally {
+            button.disabled = false;
+        }
+    });
+
+    updateForm();
+    loadState().catch(error => {
+        message(error.message, true);
+        emptyTable('stockRows', 5, 'Ошибка загрузки');
+        emptyTable('historyRows', 8, 'Ошибка загрузки');
+    });
+</script>
+
+<datalist id="printerModels"></datalist>
+
+<script>
+    fetch('/printer-models.json')
+        .then(response => response.json())
+        .then(models => {
+            const list = document.getElementById('printerModels');
+
+            models.forEach(model => {
+                const option = document.createElement('option');
+                option.value = model;
+                list.appendChild(option);
+            });
+        })
+        .catch(error => console.error(error));
+</script>
+
+</body>
+</html>
